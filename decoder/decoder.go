@@ -5,17 +5,17 @@ import (
 	"gstroke/errors"
 )
 
-type QuantTable struct {
-	ID uint8 //  Tq
-	Precision uint8 // Pq -> 8 or 16bit
-	values [64]uint16
-}
-
 type huffClass uint8
 const (
 	DC huffClass = 0
 	AC huffClass = 1
 )
+
+type QuantTable struct {
+	ID uint8 //  Tq
+	Precision uint8 // Pq -> 8 or 16bit
+	values [64]uint16
+}
 
 type HuffTable struct {
 	Class huffClass
@@ -24,10 +24,27 @@ type HuffTable struct {
 	Symbols []uint8
 }
 
+
+type StartOfFrame struct {
+	Precision uint8
+	Y uint16
+	X uint16
+	Nf uint8
+	Components []Component
+}
+
+type Component struct {
+	CID uint8
+	H uint8
+	V uint8
+	Tq uint8
+}
+
 type Decoder struct {
 	*Parser
 	dqt []QuantTable
 	dht []HuffTable
+	sof StartOfFrame
 }
 
 func NewDecoder(source []byte) *Decoder {
@@ -93,8 +110,11 @@ func (d* Decoder) Decode() error {
 		return errors.NewInvalidJPEGError("No SOF marker")
 	}
 
-	//TODO:
-	if err := d.parseSOF(); err != nil { return err }
+	sof, err := d.parseSOF()
+	if err != nil {
+		return err
+	}
+	d.sof = sof
 
 	d.pos = d.searchSeg(SOS)
 	if d.pos == -1 {

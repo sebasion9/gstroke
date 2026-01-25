@@ -19,9 +19,6 @@ type Parser struct {
 	source []byte
 	pos int
 	endPos int
-	// dqt [][]byte
-	dht [][]byte
-	sof []byte
 	sos []byte
 	scan []byte
 }
@@ -145,7 +142,7 @@ func (p* Parser) parseDHT() ([]HuffTable, error) {
 		}
 
 		if pos + symbolsNum > end {
-			return nil, errors.NewInvalidJPEGError("Trucated DHT symbols")
+			return nil, errors.NewInvalidJPEGError("Truncated DHT symbols")
 		}
 
 		symbols := make([]uint8, symbolsNum)
@@ -169,21 +166,69 @@ func (p* Parser) parseDHT() ([]HuffTable, error) {
 }
 
 // start of frame, entropy-coded baseline frame
-func(p Parser) parseSOF() error {
+func(p Parser) parseSOF() (StartOfFrame, error) {
+	sof := StartOfFrame{}
 	// advance marker bytes
 	pos := p.pos + 2
 	if pos + 2 > len(p.source) {
-		return errors.NewInvalidJPEGError("Invalid SOF segment")
+		return sof, errors.NewInvalidJPEGError("Invalid SOF segment")
 	}
 
 	segSize := int(binary.BigEndian.Uint16(p.source[pos:pos+2]))
+	pos += 2
+	end := pos + segSize - 2
 
-	table := make([]byte, segSize - 2)
-	copy(table, p.source[pos+2:pos+segSize])
-	p.sof = table
+	if pos + 4 > end {
+		return sof, errors.NewInvalidJPEGError("Truncated SOF segment")
+	}
 
-	p.pos = pos+segSize
-	return nil
+	precision := p.source[pos]
+	if precision != 8 {
+		return sof, errors.NewInvalidJPEGError("SOF segment invalid, only supports precision = 8")
+	}
+
+	pos++
+	y := binary.BigEndian.Uint16(p.source[pos:pos+2])
+	x := binary.BigEndian.Uint16(p.source[pos+2:pos+4])
+	pos += 4
+
+	nf := uint8(p.source[pos])
+	pos++
+
+	var components []Component
+	for range nf {
+		if pos + 2 > end {
+			return sof, errors.NewInvalidJPEGError("Truncated SOF segment")
+		}
+		cid := p.source[pos]
+		hv := p.source[pos+1]
+		tq := p.source[pos+2]
+		if tq > 3 {
+			return sof, errors.NewInvalidJPEGError("Invalid Tqi value for component")
+		}
+
+		h := hv >> 4
+		v := hv & 0x0f
+
+		components = append(components, Component{
+			H: h,
+			V: v,
+			CID: cid,
+			Tq: tq,
+		})
+
+		pos += 3
+	}
+
+	sof.Components = components
+	sof.Nf = nf
+	sof.Precision = precision
+	sof.X = x
+	sof.Y = y
+
+
+	p.pos = pos
+	return sof, nil
 }
 
 // start of scan
