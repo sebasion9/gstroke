@@ -20,7 +20,6 @@ type Parser struct {
 	pos int
 	endPos int
 	sos []byte
-	scan []byte
 }
 
 func newParser(source []byte) *Parser {
@@ -231,28 +230,88 @@ func(p Parser) parseSOF() (StartOfFrame, error) {
 	return sof, nil
 }
 
+//TODO:
 // start of scan
-func(p Parser) parseSOS() error {
+func(p Parser) parseSOS() (StartOfScan, error) {
+	sos := StartOfScan{}
 	// advance marker bytes
 	pos := p.pos + 2
 	if pos + 2 > len(p.source) {
-		return errors.NewInvalidJPEGError("Invalid SOF segment")
+		return sos, errors.NewInvalidJPEGError("Invalid SOF segment")
 	}
 
 	segSize := int(binary.BigEndian.Uint16(p.source[pos:pos+2]))
+	pos += 2
+	end := pos + segSize - 2
 
-	table := make([]byte, segSize - 2)
-	copy(table, p.source[pos+2:pos+segSize])
-	p.sos = table
+	ns := uint8(p.source[pos])
+	pos++
+	var scanComponents []ScanComponent
 
-	p.pos = pos+segSize
-	return nil
+	for range ns {
+		if pos + 1 > end {
+			return sos, errors.NewInvalidJPEGError("Truncated SOS segment")
+		}
+
+		cs := p.source[pos]
+		tx := p.source[pos+1]
+
+		td := tx >> 4
+		ta := tx & 0x0f
+
+		scanComponents = append(scanComponents, ScanComponent{
+			Cs: cs,
+			Td: td,
+			Ta: ta,
+		})
+
+
+		pos += 2
+	}
+
+	if pos + 3 > end {
+		return sos, errors.NewInvalidJPEGError("Truncated SOS segment")
+	}
+
+	ss := uint8(p.source[pos])
+	se := uint8(p.source[pos+1])
+	succApprox := p.source[pos+2]
+	sah := succApprox >> 4
+	sal := succApprox & 0x0f
+
+	sos.ScanComponents = scanComponents
+	sos.Ns = ns
+	sos.SuccApproxH = sah
+	sos.SuccApproxL = sal
+	sos.StartSpectralPredictor = ss
+	sos.EndSpectralPredictor = se
+
+	return sos, nil
 }
 
-func(d *Parser) parseScan() error {
-	table := make([]byte, d.endPos - d.pos)
-	copy(table, d.source[d.pos:d.endPos])
-	d.scan = table
-	d.pos = d.endPos
-	return nil
+//TODO: verify scan works correctly
+func(p *Parser) parseScan() ([]byte, error) {
+	if p.pos >= p.endPos {
+		return nil, errors.NewInvalidJPEGError("Invalid scan size")
+	}
+	var table []byte
+	ff := false
+	for i := p.pos; i < p.endPos; i++ {
+		b := p.source[i]
+		if b == 0xFF {
+			ff = true
+			continue
+		}
+		if ff {
+			if b == 0x00 {
+				table = append(table, 0xFF)
+				ff = false
+			}
+			continue
+		}
+		table = append(table, b)
+	}
+
+	p.pos = p.endPos
+	return table, nil
 }

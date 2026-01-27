@@ -40,11 +40,28 @@ type Component struct {
 	Tq uint8
 }
 
+type StartOfScan struct {
+	Ns uint8
+	ScanComponents []ScanComponent
+	StartSpectralPredictor uint8
+	EndSpectralPredictor uint8
+	SuccApproxH uint8
+	SuccApproxL uint8
+}
+
+type ScanComponent struct {
+	Cs uint8
+	Td uint8
+	Ta uint8
+}
+
 type Decoder struct {
 	*Parser
 	dqt []QuantTable
 	dht []HuffTable
 	sof StartOfFrame
+	sos StartOfScan
+	scan []byte
 }
 
 func NewDecoder(source []byte) *Decoder {
@@ -122,9 +139,18 @@ func (d* Decoder) Decode() error {
 	}
 
 
-	//TODO:
-	if err := d.parseSOS(); err != nil { return err }
-	if err := d.parseScan(); err != nil { return err }
+	sos, err := d.parseSOS()
+	if err != nil {
+		return err
+	}
+	d.sos = sos
+
+	scan, err := d.parseScan()
+	if err != nil {
+		return err
+	}
+	d.scan = scan
+	fmt.Println(len(scan))
 
 	return nil
 }
