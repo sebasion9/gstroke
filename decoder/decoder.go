@@ -57,6 +57,7 @@ type ScanComponent struct {
 
 type Decoder struct {
 	*Parser
+	*BitReader
 	dqt []QuantTable
 	dht []HuffTable
 	sof StartOfFrame
@@ -67,6 +68,7 @@ type Decoder struct {
 func NewDecoder(source []byte) *Decoder {
 	return &Decoder{
 		Parser: newParser(source),
+		BitReader: newBitReader(),
 	}
 }
 
@@ -150,7 +152,14 @@ func (d* Decoder) Decode() error {
 		return err
 	}
 	d.scan = scan
-	fmt.Println(len(scan))
+	d.BitReader.scan = scan
+
+	d.decodeHuffman()
 
 	return nil
 }
+
+func (d *Decoder) decodeHuffman() {
+
+}
+
