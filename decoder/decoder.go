@@ -22,6 +22,9 @@ type HuffTable struct {
 	ID uint8
 	Counts [16]uint8
 	Symbols []uint8
+	Codes []int // huffman codes
+	Lengths []int
+	MaxBits int
 }
 
 
@@ -160,6 +163,5 @@ func (d* Decoder) Decode() error {
 }
 
 func (d *Decoder) decodeHuffman() {
-
 }
 

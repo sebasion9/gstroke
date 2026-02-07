@@ -122,6 +122,8 @@ func (p* Parser) parseDHT() ([]HuffTable, error) {
 	end := pos + segSize - 2
 
 	for ; pos < end; {
+		huffTable := HuffTable{}
+
 		header := p.source[pos]
 		pos++
 
@@ -148,13 +150,12 @@ func (p* Parser) parseDHT() ([]HuffTable, error) {
 		copy(symbols, p.source[pos:pos+symbolsNum])
 		pos += symbolsNum
 
-
-		tables = append(tables, HuffTable{
-			Class: huffClass(class),
-			ID: id,
-			Counts: counts,
-			Symbols: symbols,
-		})
+		huffTable.Class = huffClass(class)
+		huffTable.ID = id
+		huffTable.Counts = counts
+		huffTable.Symbols = symbols
+		huffTable.BuildCanonical()
+		tables = append(tables, huffTable)
 
 	}
 
