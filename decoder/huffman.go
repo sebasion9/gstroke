@@ -1,6 +1,5 @@
 package decoder
 
-import "fmt"
 
 func (h *HuffTable) BuildCanonical() {
 	h.Codes = make([]int, len(h.Symbols))
@@ -27,5 +26,4 @@ func (h *HuffTable) BuildCanonical() {
 	}
 
 	h.MaxBits = maxBits
-	fmt.Printf("%+v\n", h)
 }
